@@ -35,7 +35,7 @@ class chatbot:
 
         self._timestamp = '{}'.format(datetime.datetime.now()).replace('-', '_').replace(':', '_').replace(' ','_') if profile is None else profile['timestamp']
 
-        self.make_history_handler()
+        self._history_handler = None
 
     def make_history_handler(self):
         if not os.path.exists(chatbot.HISTORY_DIR):
@@ -43,7 +43,6 @@ class chatbot:
 
         self._current_history = os.path.abspath(os.path.join(chatbot.HISTORY_DIR, f'chat_{self._timestamp}.md'))
         self._history_handler = open(self._current_history, 'a+', encoding='utf-8')
-        self._history_handler.write('# *Init chatbot*\n\n')
 
     def save_profile(self):
         if len(self._messages)==0: # null conversation, do not save
@@ -109,6 +108,8 @@ class chatbot:
             }
         )
 
+        if self._history_handler is None:
+            self.make_history_handler()
         self._history_handler.write(f'>###### User:\n\n{text}\n\n...... Waiting AI ......\n\n')
         self._history_handler.flush()
 
@@ -120,6 +121,8 @@ class chatbot:
             }
         )
         
+        if self._history_handler is None:
+            self.make_history_handler()
         self._history_handler.write(f'>###### AI:\n\n{text}\n\n-----------------------------------------------------------\n\n')
         self._history_handler.flush()
 
