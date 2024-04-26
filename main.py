@@ -7,7 +7,7 @@ import os
 import signal
 
 NEED_RERUN = False #
-EMPTY_PROFILE = ''
+EMPTY_PROFILE = '[ClickToChose]'
 MSG_RANGE_MIN = 1
 MSG_RANGE_MAX = 9
 

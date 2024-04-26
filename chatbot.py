@@ -5,14 +5,20 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 import time
 from collections import OrderedDict
+import sys
+
 
 class chatbot:
     env_inited = False
     azure_server = {}
 
-    ROOT = os.path.dirname(os.path.abspath(__file__))
+    if hasattr(sys, '_MEIPASS'):
+        ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(sys.executable))))
+    else:
+        ROOT = os.path.dirname(os.path.abspath(__file__))
     HISTORY_DIR = os.path.join(ROOT, 'history')
     PROFILE_DIR = os.path.join(ROOT, 'profile')
+    ENV_FILE = os.path.join(ROOT, '.env')
 
     def __init__(self) -> None:
         if not chatbot.env_inited:
@@ -22,6 +28,11 @@ class chatbot:
         self.init()
 
     def init(self, profile=None):
+        for env_var in ['API_KEY', 'ENDPOINT', 'OPENAI_GPT_DEPLOYMENT_NAME']:
+            if os.getenv(env_var) is None:
+                raise Exception(f'{env_var} not found in {chatbot.ENV_FILE}')
+
+
         api_key = os.getenv("API_KEY")  # azure_server['key']
         api_version = "2024-02-15-preview"
         azure_endpoint = os.getenv("ENDPOINT") # azure_server['endpoint']
@@ -48,10 +59,9 @@ class chatbot:
         if len(self._messages)==0: # null conversation, do not save
             return
         
-        profile_folder = 'profile'
-        if not os.path.exists(profile_folder):
-            os.mkdir(profile_folder)
-        current_profile = os.path.abspath(os.path.join(profile_folder, f'chat_{self._timestamp}.json'))
+        if not os.path.exists(chatbot.PROFILE_DIR):
+            os.mkdir(chatbot.PROFILE_DIR)
+        current_profile = os.path.abspath(os.path.join(chatbot.PROFILE_DIR, f'chat_{self._timestamp}.json'))
         with open(current_profile, 'w+', encoding='utf-8') as f:
             json.dump(self.profile(), f, indent=4)
 
@@ -146,7 +156,7 @@ class chatbot:
 
     @staticmethod
     def force_load_env():
-        load_dotenv()
+        load_dotenv(chatbot.ENV_FILE)
 
 
     #just for future
