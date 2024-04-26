@@ -50,7 +50,11 @@ Perform the following steps in the directory simple_chat_bot.
    #pyinstaller --onefile --additional-hooks-dir=./hooks simpleChatBot.py --clean
    ```
 
-   edit ```simpleChatBot.spec``` file: replace 'C:/ProgramData/Anaconda3/envs/chatbot' to the path of your python environment.
+   edit ```simpleChatBot.spec``` file: 
+   
+   * replace 'C:/ProgramData/Anaconda3/envs/chatbot/Lib' to the path of your python environment. 
+     
+     (the path should be like '/data/anaconda3/envs/chatbot/lib/python3.9' on Linux.)
 
 
 * edit ```cli.py``` file inside the ```streamlit\web``` folder of your python environment:
@@ -58,7 +62,10 @@ Perform the following steps in the directory simple_chat_bot.
     In my environment that file is:
 
     ```
+    #on Windows
     C:\ProgramData\Anaconda3\envs\chatbot\Lib\site-packages\streamlit\web\cli.py
+    #on Linux:
+    /data/anaconda3/envs/chatbot/lib/python3.9/site-packages/streamlit/web/cli.py
     ```
 
     Add next code block to cli.py file:
@@ -84,5 +91,5 @@ Perform the following steps in the directory simple_chat_bot.
 
   create a .env file under ```dist``` before call ```dist/simpleChatBot.exe```.
 
-
+* pyInstaller + streamlit [reference](https://github.com/jvcss/PyInstallerStreamlit/tree/master)
 
