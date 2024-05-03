@@ -101,14 +101,12 @@ with st.sidebar:
     with col2:
         st.session_state.new_chat = st.checkbox('new chat', value=True)
 
-    if st.button('Save & List Topics'):
-        st.session_state.chatbot.save_profile()
+    if st.button('List Topics'):
         st.session_state.profiles = chatbot.list_profiles()
         st.session_state.profiles[EMPTY_PROFILE] = {}
 
     selected_topic = st.selectbox('Select a chat', list(st.session_state.profiles.keys()), index=len(st.session_state.profiles)-1, label_visibility='collapsed')
     if selected_topic and EMPTY_PROFILE!=selected_topic and selected_topic!=st.session_state.current_topic:
-        st.session_state.chatbot.save_profile()
         st.session_state.current_topic = selected_topic
         new_chat(st.session_state.profiles[selected_topic]['data'])
 
@@ -175,25 +173,34 @@ if not st.session_state.is_waiting:
         with st.chat_message("user"):
             st.session_state.chatbot.on_user_input(prompt)
             st.session_state.current_profile = st.session_state.chatbot.profile()
-        NEED_RERUN = True
+            st.session_state.chatbot.save_profile()
+            NEED_RERUN = True
 else:
     st.chat_input(disabled=True)
     infer_size = st.session_state.message_range
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            if st.session_state.is_dmy:
-                message = st.session_state.chatbot.dmy_response(1)
-            else:# st.session_state.is_stream:
-                response_placeholder = st.empty()
-                message = update_stream(response_placeholder, infer_size=infer_size)
-            # else:
-            #     message = st.session_state.chatbot.generate_response(infer_size=infer_size)
+            for retry in range(3):
+                try:
+                    if st.session_state.is_dmy:
+                        message = st.session_state.chatbot.dmy_response(1)
+                    else:# st.session_state.is_stream:
+                        response_placeholder = st.empty()
+                        message = update_stream(response_placeholder, infer_size=infer_size)
+                    # else:
+                    #     message = st.session_state.chatbot.generate_response(infer_size=infer_size)
+                    break
+                except Exception as e:
+                    st.error(f'#{retry} fail! Retrying...')
+                    if retry==3-1: raise e
+                    time.sleep(1)
 
             st.session_state.chatbot.on_ai_response(message)
             st.session_state.current_profile = st.session_state.chatbot.profile()
+            st.session_state.chatbot.save_profile()
+            NEED_RERUN = True
 
-    st.session_state.is_waiting = False
-    NEED_RERUN = True
+            st.session_state.is_waiting = False
 
 
  
