@@ -121,8 +121,9 @@ for message in st.session_state.chatbot.messages():
             with col1:
                 st.markdown("```\n{}\n```".format(text))
             with col2:
-                if st.button('Copy', key=f'conversation_{n}', on_click=lambda:pyperclip.copy(text), disabled=st.session_state.is_waiting):
-                    st.success(f'Copied!')
+                #pyperclip.copy fail on Linux, do not use this button any more.
+                # if st.button('Copy', key=f'conversation_{n}', on_click=lambda:pyperclip.copy(text), disabled=st.session_state.is_waiting):
+                #     st.success(f'Copied!')
                 if inside_msg:
                     st.write('💬')
     else:
