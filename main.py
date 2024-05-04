@@ -152,6 +152,19 @@ st.markdown( #just for PC, we expand the conversation area
     unsafe_allow_html=True,
 )
 
+st.markdown( #just for PC, we expand the conversation area
+    """
+    <style>
+        .stChatFloatingInputContainer {
+            background-color: transparent !important;
+            bottom:-7%
+        }
+        /* Additional custom styles */
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+ 
 def update_stream(placeholder, infer_size):
     response = st.session_state.chatbot.generate_event(infer_size=infer_size) 
     collected_messages = []
@@ -203,19 +216,5 @@ else:
 
             st.session_state.is_waiting = False
 
-
-st.markdown( #just for PC, we expand the conversation area
-    """
-    <style>
-        .stChatFloatingInputContainer {
-            background-color: transparent !important;
-            bottom:-7%
-        }
-        /* Additional custom styles */
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
- 
 if NEED_RERUN:
     st.rerun()
