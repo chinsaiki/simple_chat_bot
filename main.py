@@ -133,8 +133,9 @@ for message in st.session_state.chatbot.messages():
             with col1:
                 st.markdown(response)
             with col2:
-                if st.button('Copy', key=f'conversation_{n}', on_click=lambda:pyperclip.copy(response), disabled=st.session_state.is_waiting):
-                    st.success(f'Copied!')
+                #pyperclip.copy fail on Linux, do not use this button any more.
+                # if st.button('Copy', key=f'conversation_{n}', on_click=lambda:pyperclip.copy(response), disabled=st.session_state.is_waiting):
+                #     st.success(f'Copied!')
                 if inside_msg:
                     st.write('💬')
     n -= 1
@@ -146,7 +147,6 @@ st.markdown( #just for PC, we expand the conversation area
             width: 160%;
             margin-left: -210px;
         }
-        /* Additional custom styles */
     </style>
     """,
     unsafe_allow_html=True,
@@ -204,6 +204,18 @@ else:
             st.session_state.is_waiting = False
 
 
+st.markdown( #just for PC, we expand the conversation area
+    """
+    <style>
+        .stChatFloatingInputContainer {
+            background-color: transparent !important;
+            bottom:-7%
+        }
+        /* Additional custom styles */
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
  
 if NEED_RERUN:
     st.rerun()
