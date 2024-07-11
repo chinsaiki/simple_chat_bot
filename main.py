@@ -41,6 +41,8 @@ def list_assistants():
                       f"2. 总结相关信息并给出问题的答案。" \
                       f"3. 从文档之外你所知数据中提供问题答案的相关参考信息。"
 
+    ass["specific document Analyst Assistant"] = "You are an expert specific document analyst. Use your knowledge base to answer questions about audited specific document statements."
+
     return ass
 
 
@@ -76,20 +78,29 @@ if 'is_dmy' not in st.session_state:
     # st.session_state.is_stream = True
 if 'is_assistant' not in st.session_state:
     st.session_state.is_assistant = False
+if 'with_file' not in st.session_state:
+    st.session_state.with_file = False
 if 'message_range' not in st.session_state:
     st.session_state.message_range = 3
 if 'new_chat' not in st.session_state:
     st.session_state.new_chat = True
+
 if 'current_profile' not in st.session_state:
     st.session_state.current_profile = None
 if 'current_topic' not in st.session_state:
     st.session_state.current_topic = None
 if 'profiles' not in st.session_state:
     st.session_state.profiles = {}
+
 if 'current_assistant' not in st.session_state:
     st.session_state.current_assistant = None
 if 'assistants' not in st.session_state:
     st.session_state.assistants = {}
+
+if 'current_vector_store' not in st.session_state:
+    st.session_state.current_vector_store = None
+if 'vector_stores' not in st.session_state:
+    st.session_state.vector_stores = {}
 
 with st.sidebar:
     port = get_current_port()
@@ -138,17 +149,52 @@ with st.sidebar:
         st.session_state.current_topic = selected_topic
         new_chat(st.session_state.profiles[selected_topic]['data'])
 
+
     if st.button('列出助手'):
         st.session_state.assistants = list_assistants()
         st.session_state.assistants[EMPTY_PROFILE] = ""
 
     selected_assistant = st.selectbox('选择助手', list(st.session_state.assistants.keys()), index=len(st.session_state.assistants)-1, label_visibility='collapsed')
-    if selected_assistant and EMPTY_PROFILE!=selected_assistant and selected_assistant!=st.session_state.current_assistant:
+    if selected_assistant and EMPTY_PROFILE!=selected_assistant and (selected_assistant!=st.session_state.current_assistant or not st.session_state.chatbot.assistant_ready()):
         with st.spinner("Initializing..."):
             st.session_state.current_assistant = selected_assistant
             st.session_state.chatbot.init_assistant(selected_assistant, st.session_state.assistants[selected_assistant])
             st.success("助手已初始化")
     st.session_state.is_assistant = st.checkbox('助手模式', value=False)
+
+
+    if st.button('列出文档库'):
+        #st.session_state.vector_stores = 
+        st.session_state.chatbot.list_vector_stores()
+        #st.session_state.vector_stores[EMPTY_PROFILE] = ""
+
+    # selected_assistant = st.selectbox('选择助手', list(st.session_state.assistants.keys()), index=len(st.session_state.assistants)-1, label_visibility='collapsed')
+    # if selected_assistant and EMPTY_PROFILE!=selected_assistant and selected_assistant!=st.session_state.current_assistant:
+    #     with st.spinner("Initializing..."):
+    #         st.session_state.current_assistant = selected_assistant
+    #         st.session_state.chatbot.init_assistant(selected_assistant, st.session_state.assistants[selected_assistant])
+    #         st.success("助手已初始化")
+    # st.session_state.is_assistant = st.checkbox('助手模式', value=False)
+
+
+    # 创建上传文件的组件
+    with st.form("upload-file", True):
+        uploaded_file = st.file_uploader("上传文件", type=["pdf", "txt"], accept_multiple_files=False)
+        append = st.checkbox('追加', value=False)
+        submitted = st.form_submit_button("上传")
+        if submitted and uploaded_file is not None:
+            st.session_state.chatbot.upload_file(uploaded_file.name, uploaded_file, append)
+            # backup_file(st.session_state[DAMP_AP_CONFIG_SOURCE], st.success, st.error)
+
+            # # 保存上传的文件
+            # with open(st.session_state[DAMP_AP_CONFIG_SOURCE], "wb") as f:
+            #     f.write(uploaded_file.getbuffer())
+            # st.success(f'文件上传成功，保存到 {st.session_state[DAMP_AP_CONFIG_SOURCE]}')
+    st.session_state.with_file = st.checkbox('谈谈文件', value=False)
+
+
+
+
 
 # Display chat messages
 n = len(st.session_state.chatbot.messages())
@@ -234,10 +280,16 @@ if not st.session_state.is_waiting:
     if prompt := st.chat_input():
         st.session_state.is_waiting = True
         with st.chat_message("user"):
-            st.session_state.chatbot.on_user_input(prompt)
-            st.session_state.current_profile = st.session_state.chatbot.profile()
-            st.session_state.chatbot.save_profile()
-            NEED_RERUN = True
+            st.info(prompt)
+            try:
+                print('on_user_input >>')
+                st.session_state.chatbot.on_user_input(prompt, with_file=st.session_state.with_file)
+                st.session_state.current_profile = st.session_state.chatbot.profile()
+                st.session_state.chatbot.save_profile()
+                NEED_RERUN = True
+                print('on_user_input OK')
+            except:
+                st.session_state.is_waiting = False
 else:
     st.chat_input(disabled=True)
     infer_size = st.session_state.message_range

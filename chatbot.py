@@ -37,7 +37,7 @@ class chatbot:
 
 
         api_key = os.getenv("API_KEY")  # azure_server['key']
-        api_version = "2024-02-15-preview"
+        api_version = "2024-05-01-preview"
         azure_endpoint = os.getenv("ENDPOINT") # azure_server['endpoint']
         self._client = AzureOpenAI(
                         api_key=api_key,  
@@ -46,7 +46,7 @@ class chatbot:
                     )
         self._messages = []
         if profile is not None:
-            if 'message' in profile: self._messages = profile['messages']
+            if 'messages' in profile: self._messages = profile['messages']
         self._model = os.getenv("OPENAI_GPT_DEPLOYMENT_NAME") # azure_server['gpt']
 
         self._timestamp = '{}'.format(datetime.datetime.now()).replace('-', '_').replace(':', '_').replace(' ','_') if profile is None else profile['timestamp']
@@ -115,7 +115,7 @@ class chatbot:
         message = "this is dmy resopnse of '''" + self._messages[-1]['content'] + "'''"
         return message
 
-    def on_user_input(self, text):
+    def on_user_input(self, text, with_file=False):
         self._messages.append(
             {
                 "role":"user",
