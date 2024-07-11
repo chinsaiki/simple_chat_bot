@@ -158,7 +158,14 @@ with st.sidebar:
     if selected_assistant and EMPTY_PROFILE!=selected_assistant and (selected_assistant!=st.session_state.current_assistant or not st.session_state.chatbot.assistant_ready()):
         with st.spinner("Initializing..."):
             st.session_state.current_assistant = selected_assistant
-            st.session_state.chatbot.init_assistant(selected_assistant, st.session_state.assistants[selected_assistant])
+            for retry in range(3):
+                try:
+                    st.session_state.chatbot.init_assistant(selected_assistant, st.session_state.assistants[selected_assistant])
+                    break
+                except Exception as e:
+                    st.error(f'{e}'[-20:])
+                    st.error(f'#{retry} fail! Retrying...')
+                    if retry==3-1: raise e
             st.success("助手已初始化")
     st.session_state.is_assistant = st.checkbox('助手模式', value=False)
 
@@ -180,10 +187,18 @@ with st.sidebar:
     # 创建上传文件的组件
     with st.form("upload-file", True):
         uploaded_file = st.file_uploader("上传文件", type=["pdf", "txt"], accept_multiple_files=False)
-        append = st.checkbox('追加', value=False)
         submitted = st.form_submit_button("上传")
         if submitted and uploaded_file is not None:
-            st.session_state.chatbot.upload_file(uploaded_file.name, uploaded_file, append)
+            for retry in range(3):
+                try:
+                    st.session_state.chatbot.upload_file(uploaded_file.name, uploaded_file)
+                    break
+                except Exception as e:
+                    st.error(f'{e}'[-20:])
+                    st.error(f'#{retry} fail! Retrying...')
+                    if retry==3-1: raise e
+            st.success("上传成功")
+            st.session_state.chatbot.with_file()
             # backup_file(st.session_state[DAMP_AP_CONFIG_SOURCE], st.success, st.error)
 
             # # 保存上传的文件
@@ -282,12 +297,10 @@ if not st.session_state.is_waiting:
         with st.chat_message("user"):
             st.info(prompt)
             try:
-                print('on_user_input >>')
                 st.session_state.chatbot.on_user_input(prompt, with_file=st.session_state.with_file)
                 st.session_state.current_profile = st.session_state.chatbot.profile()
                 st.session_state.chatbot.save_profile()
                 NEED_RERUN = True
-                print('on_user_input OK')
             except:
                 st.session_state.is_waiting = False
 else:

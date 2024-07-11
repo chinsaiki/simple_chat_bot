@@ -18,7 +18,7 @@ class chatbotAssist(chatbot):
     def init(self, profile=None):
         super(chatbotAssist, self).init(profile)
         self.assist_init()
-        print(f'init {self.messages()}')
+        self._vector_stores = []
 
     def assist_init(self):
         '''
@@ -27,7 +27,6 @@ class chatbotAssist(chatbot):
         self._assistant = None
         self._thread = None
         self._message_file = None
-        self._vid = None
 
     def assistant_ready(self):
         return self._assistant is not None
@@ -42,6 +41,7 @@ class chatbotAssist(chatbot):
                             instructions=instruction,
                             tools=[{"type": "code_interpreter"}], #文档需要
                             model=self._model,
+                            timeout=30,
                         )
         self.init_thread(infer_size=infer_size)
         print('assistant initialized.')
@@ -55,51 +55,38 @@ class chatbotAssist(chatbot):
                                                                 content=msg["content"] # Replace this with your prompt
                                                             )
 
-    def on_user_input(self, text, with_file=False):
-        if with_file and self._vid:
-            # print(self._assistant.tool_resources.file_search)
-            self._assistant = self._client.beta.assistants.update(
-                                                                    assistant_id=self._assistant.id,
-                                                                    tools=[{"type": "file_search"}],
-                                                                    tool_resources={"file_search": {"vector_store_ids": [self._vid]}},
-                                                                    )
-            # print(self._assistant.tool_resources.file_search)
-            # print(self._thread.tool_resources.file_search)
-            # self._thread = self._client.beta.threads.update(
-            #                                                     thread_id=self._thread.id,
-            #                                                     tool_resources={"file_search": {"vector_store_ids": [self._vid]}},
-            #                                                 )
-            # print(self._thread.tool_resources.file_search)
-            self._thread = self._client.beta.threads.create()
-
-        if self.assistant_ready():
-            # attachments = None
-            # if with_file and self._message_file is not None:
-            #     attachments.=[
-            #         { "file_id": self._message_file.id, "tools": [{"type": "file_search"}] }
-            #     ]
-            message = self._client.beta.threads.messages.create(
-                                                                thread_id=self._thread.id,
-                                                                role='user',
-                                                                content=text, # Replace this with your prompt
-                                                                # attachments=attachments,
+    def with_file(self, vid_list):
+        self._assistant = self._client.beta.assistants.update(
+                                                                assistant_id=self._assistant.id,
+                                                                tools=[{"type": "file_search"}],
+                                                                tool_resources={"file_search": {"vector_store_ids": vid_list}},
                                                                 )
-            # print(attachments)
-        super(chatbotAssist, self).on_user_input(text)
+        self._thread = self._client.beta.threads.update(
+                                                            thread_id=self._thread.id,
+                                                            tool_resources={"file_search": {"vector_store_ids": vid_list}},
+                                                        )
 
-    def generate_response(self, infer_size=5):
-        '''
-        返回消息列表或抛出异常
-        '''
-        if not self.assistant_ready():
-            raise Exception('助手未初始化，请【列出助手】-【选择助手】')
-
+    def sync_user_msg(self):
         messages = self._client.beta.threads.messages.list(
                                                             thread_id =self._thread.id
                                                         )
         # data = json.loads(messages.model_dump_json(indent=2))
-        if messages.data[0].role!='user':
-            raise Exception('Not user message')
+        if messages.data[0].role!=self._messages[-1]["role"] or messages.data[0].content[0].text.value!=self._messages[-1]["content"]:
+            message = self._client.beta.threads.messages.create(
+                                                                thread_id=self._thread.id,
+                                                                role=self._messages[-1]["role"],
+                                                                content=self._messages[-1]["content"], # Replace this with your prompt
+                                                                )
+
+
+    def generate_response(self, infer_size=5):
+        '''
+        返回 消息列表或抛出异常
+        '''
+        if not self.assistant_ready():
+            raise Exception('助手未初始化，请【列出助手】-【选择助手】')
+
+        self.sync_user_msg()
 
         print('waiting openai...')
         
@@ -149,6 +136,7 @@ class chatbotAssist(chatbot):
                                             "content":text,
                                             "assistant_type":self.assistant_name(),
                                             "type":'text',
+                                            "tool_resources":self._thread.tool_resources.model_dump_json(indent=2),
                                         }
                                     )
 
@@ -165,6 +153,7 @@ class chatbotAssist(chatbot):
                                             "content":save_path,
                                             "assistant_type":self.assistant_name(),
                                             "type":'image_file',
+                                            "tool_resources":self._thread.tool_resources.model_dump_json(indent=2),
                                         }
                                     )
 
@@ -178,54 +167,47 @@ class chatbotAssist(chatbot):
         return responses
     
     def create_vecotr_store(self, name):
-        vid = self.find_vector_store_id(name, file_nb=1)
-        if vid is None:
-            vector_store = self._client.beta.vector_stores.create(name=name)
-            vid = vector_store.id
-        return vid
+        vector_store = self._client.beta.vector_stores.create(name=name)
+        return vector_store.id
 
-    def list_vector_stores(self):
-        print('----')
-        vector_stores = []
-        try:
-            vector_stores = self._client.beta.vector_stores.list()
-            for vs in vector_stores:
-                print("* ", vs.name, datetime.datetime.fromtimestamp(vs.created_at), vs.id, vs.file_counts.completed)
-        finally:
-            return vector_stores
+    def list_vector_stores(self, online=False):
+        if online:
+            self._vector_stores = []
+            self._vector_stores = self._client.beta.vector_stores.list()
+            for vs in self._vector_stores:
+                print("* ", vs.name, datetime.datetime.fromtimestamp(vs.created_at), vs.id, vs.file_counts.completed, vs.status)
+        return self._vector_stores
 
-    def find_vector_store_id(self, name, file_nb=-1):
-        vector_stores = self.list_vector_stores()
-        for vs in vector_stores:
-            if vs.name==name and (file_nb<0 or vs.file_counts.completed==file_nb):
+    def find_vector_store_id(self, name, file_nb=-1, online=False):
+        self.list_vector_stores(online=online)
+        for vs in self._vector_stores:
+            if vs.name==name and vs.status=='completed' and (file_nb<0 or vs.file_counts.completed==file_nb):
                 return vs.id
         return None
 
-    def upload_file(self, name, data, append):
+    def upload_file(self, name, data):
         name = os.path.split(name)[-1]
-        print(f'{name}, cur_vid={self._vid}, append={append}')
 
-        if not append:
-            self._vid = self.find_vector_store_id(name, file_nb=1)
-            if self._vid:
-                print(f'找到 文件在 {self._vid}')
+        for online in [False, True]:
+            vid = self.find_vector_store_id(name, file_nb=1, online=online)
+            if vid:
+                print(f'找到 文件在 {vid}')
                 return
 
-        if not self._vid:
-            self._vid = self.create_vecotr_store(name)
-
-        # self._message_file = self._client.files.create(
-        #     file=data, purpose="assistants"
-        # )
-        # print(self._message_file.id)
+        vid = self.create_vecotr_store(name)
 
         file_batch = self._client.beta.vector_stores.file_batches.upload_and_poll(
-            vector_store_id=self._vid, files=[data]
+            vector_store_id=vid, files=[data]
         )
-        while file_batch.status in ['queued', 'in_progress', 'cancelling']:
+        while file_batch.status in ['in_progress']:
             time.sleep(1)
             file_batch = self._client.beta.vector_stores.file_batches.retrieve(
-                vector_store_id=self._vid,
+                vector_store_id=vid,
             )
         print(file_batch.status)
         print(file_batch.file_counts)
+
+        if file_batch.status=='completed':
+            self._vector_stores.append(self._client.beta.vector_stores.retrieve(vector_store_id = vid))
+
+        raise Exception(f'upload {file_batch.status}')
