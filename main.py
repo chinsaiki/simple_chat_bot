@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.config as stopt
 from chatbot import chatbot
-from chatbotAss import chatbotAss
+from chatbotAssist import chatbotAssist
 import pyperclip
 import time
 import os
@@ -67,7 +67,7 @@ def new_chat(profile=None):
 st.set_page_config(page_title="🤗💬 Simple Chat Bot")
 
 if 'chatbot' not in st.session_state.keys():
-    st.session_state.chatbot = chatbotAss()
+    st.session_state.chatbot = chatbotAssist()
 if 'is_waiting' not in st.session_state:
     st.session_state.is_waiting = False
 if 'is_dmy' not in st.session_state:
