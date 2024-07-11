@@ -28,6 +28,9 @@ class chatbot:
         self.init()
 
     def init(self, profile=None):
+        '''
+        profile: 从历史记录加载时所需，目前只加载 profile['messages']
+        '''
         for env_var in ['API_KEY', 'ENDPOINT', 'OPENAI_GPT_DEPLOYMENT_NAME']:
             if os.getenv(env_var) is None:
                 raise Exception(f'{env_var} not found in {chatbot.ENV_FILE}')
@@ -41,7 +44,9 @@ class chatbot:
                         api_version=api_version,
                         azure_endpoint = azure_endpoint
                     )
-        self._messages = [] if profile is None else profile['messages']
+        self._messages = []
+        if profile is not None:
+            if 'message' in profile: self._messages = profile['messages']
         self._model = os.getenv("OPENAI_GPT_DEPLOYMENT_NAME") # azure_server['gpt']
 
         self._timestamp = '{}'.format(datetime.datetime.now()).replace('-', '_').replace(':', '_').replace(' ','_') if profile is None else profile['timestamp']
@@ -123,18 +128,48 @@ class chatbot:
         self._history_handler.write(f'>###### User:\n\n{text}\n\n...... Waiting AI ......\n\n')
         self._history_handler.flush()
 
-    def on_ai_response(self, text):
-        self._messages.append(
-            {
-                "role":"assistant",
-                "content":text
-            }
-        )
-        
+    def on_history_text(self, text):
         if self._history_handler is None:
             self.make_history_handler()
         self._history_handler.write(f'>###### AI:\n\n{text}\n\n-----------------------------------------------------------\n\n')
         self._history_handler.flush()
+
+    def on_history_image(self, file_path):
+        if self._history_handler is None:
+            self.make_history_handler()
+        if sys.platform == "win32": file_path = file_path.replace("\\", "/")
+        self._history_handler.write(f'>###### AI:\n\n![{file_path}]({file_path})\n\n-----------------------------------------------------------\n\n')
+        self._history_handler.flush()
+
+    def on_ai_response(self, message):
+        '''
+        message: str|list
+
+        当message是list时，元素需为以下map
+                {
+                    "role":"assistant"|"user",
+                    "content": str,
+                    "assistant_type":None|str,
+                    "type":'text'|'image_file'|None,
+                }
+        '''
+        if isinstance(message, list):
+            self._messages.extend(message)
+            for m in message:
+                if m['type']=='image_file':
+                    self.on_history_image(m["content"])
+                else:#if m['type']=='text':
+                    self.on_history_text(m["content"])
+        else:
+            self._messages.append(
+                {
+                    "role":"assistant",
+                    "content":message,
+                    "assistant_type":None,
+                    "type":'text',
+                }
+            )
+            self.on_history_text(message)
 
     def messages(self):
         return self._messages

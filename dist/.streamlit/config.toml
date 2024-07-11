@@ -2,5 +2,6 @@
 developmentMode = false
 
 [server]
+address = "10.9.3.126"
 port = 18502
 headless = true
