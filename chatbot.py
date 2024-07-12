@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 import time
 from collections import OrderedDict
 import sys
-
+from chat_message import chat_message
+import shutil
 
 class chatbot:
     env_inited = False
@@ -18,6 +19,7 @@ class chatbot:
         ROOT = os.path.dirname(os.path.abspath(__file__))
     HISTORY_DIR = os.path.join(ROOT, 'history')
     PROFILE_DIR = os.path.join(ROOT, 'profile')
+    PROFILE_TRASH_DIR = os.path.join(PROFILE_DIR, 'trash')
     ENV_FILE = os.path.join(ROOT, '.env')
 
     def __init__(self) -> None:
@@ -115,7 +117,7 @@ class chatbot:
         message = "this is dmy resopnse of '''" + self._messages[-1]['content'] + "'''"
         return message
 
-    def on_user_input(self, text, with_file=False):
+    def on_user_input(self, text):
         self._messages.append(
             {
                 "role":"user",
@@ -174,7 +176,6 @@ class chatbot:
     def messages(self):
         return self._messages
 
-
     def profile(self):
         export = {
             'messages' : self._messages,
@@ -204,13 +205,14 @@ class chatbot:
             chatbot.azure_server = config[resource_name]
             
     @staticmethod
-    def list_profiles():
+    def list_profiles(key_size=32):
         profiles = OrderedDict()
         for fname in os.listdir(chatbot.PROFILE_DIR):
             fname = os.path.join(chatbot.PROFILE_DIR, fname)
+            if not os.path.isfile(fname):continue
             with open(fname, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                key = data['summary'][:32]
+                key = data['summary'][:key_size]
                 if len(data['summary'])>len(key): key += '...'
                 if key!='null':
                     in_key = key
@@ -223,3 +225,21 @@ class chatbot:
                         'fname': fname
                     }
         return profiles
+
+    @staticmethod
+    def delete_profile(fname):
+        if not os.path.exists(fname):
+            raise Exception(f'delete {fname}: file not exist')
+
+        try:
+            if not os.path.exists(chatbot.PROFILE_TRASH_DIR):
+                os.mkdir(chatbot.PROFILE_TRASH_DIR)
+
+            file_name = os.path.basename(fname)
+
+            # 构建目标文件的完整路径
+            destination_path = os.path.join(chatbot.PROFILE_TRASH_DIR, file_name)
+            shutil.move(fname, destination_path)
+        except Exception as e:
+            print(f"Error moving file: {e}")
+            raise e
