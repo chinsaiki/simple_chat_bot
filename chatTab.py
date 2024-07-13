@@ -25,6 +25,10 @@ class chatTab():
     def id(self):
         return self._bot.id()
 
+    def messages(self):
+        return self._bot.messages()
+
+
     def place(self, on_chat_close):
         NEED_RERUN = False
 
