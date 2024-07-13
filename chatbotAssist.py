@@ -15,17 +15,17 @@ class chatbotAssist(chatbot):
         super(chatbotAssist, self).__init__()
         self.assist_init()
 
-    def init(self, profile=None):
-        super(chatbotAssist, self).init(profile)
+    def init(self):
+        super(chatbotAssist, self).init()
         self.assist_init()
-        self._vector_stores = []
 
     def assist_init(self):
         '''
-        初始化时删除旧助手
+        初始化成员变量：助手、对话线程、对话数据库
         '''
         self._assistant = None
         self._thread = None
+        self._vector_stores = []
 
     def assistant_ready(self):
         return self._assistant is not None
@@ -133,8 +133,8 @@ class chatbotAssist(chatbot):
                                         {
                                             "role":"assistant",
                                             "content":text,
-                                            "assistant_type":self.assistant_name(),
-                                            "type":'text',
+                                            "content_type":'text',
+                                            "assistant_name":self.assistant_name(),
                                             "tool_resources":self._thread.tool_resources.model_dump_json(indent=2),
                                         }
                                     )
@@ -150,8 +150,8 @@ class chatbotAssist(chatbot):
                                         {
                                             "role":"assistant",
                                             "content":save_path,
-                                            "assistant_type":self.assistant_name(),
-                                            "type":'image_file',
+                                            "content_type":'image_file',
+                                            "assistant_name":self.assistant_name(),
                                             "tool_resources":self._thread.tool_resources.model_dump_json(indent=2),
                                         }
                                     )

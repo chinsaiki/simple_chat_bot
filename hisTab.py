@@ -6,12 +6,21 @@ from chatbot import chatbot
 class hisTab():
     def __init__(self) -> None:
         self._profiles = {}
+        self._deleted = []
 
     def list_profiles(self):
         self._profiles = chatbot.list_profiles(key_size=32)
 
-    def place(self, on_load=None, on_delete=None):
-        if st.button(f'刷新'):
+    def place(self, on_new_chat, on_load=None, on_delete=None):
+        if st.button(f'新建对话'):
+            on_new_chat()
+
+        for index in self._deleted:
+            self._profiles.pop(index)
+        self._deleted = []
+
+
+        if st.button(f'刷新历史对话'):
             self.list_profiles()
 
         index = 0
@@ -24,7 +33,7 @@ class hisTab():
                     st.write(summary)
                 with cols[1]:
                     if msg_nb>1:
-                        st.markdown(profile['data']["messages"][1]['content'][:64])
+                        st.markdown(profile['data']["messages"][1]['content'][:80])
                     else:
                         st.write('[空]')
                 with cols[2]:
@@ -38,6 +47,8 @@ class hisTab():
                         if on_delete is not None:
                             on_delete(profile['data'])
                         chatbot.delete_profile(profile['fname'])
+                        self._deleted.append(summary)
             index += 1
+
 
         return False

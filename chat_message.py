@@ -2,6 +2,10 @@ from typing_extensions import Literal
 from typing import List, Union, Optional
 
 class chat_message():
+    '''
+    为了便于展示对话消息。
+    '''
+
     role: Literal["assistant", "user"]
 
     content: str

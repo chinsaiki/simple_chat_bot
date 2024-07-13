@@ -17,9 +17,9 @@ class chatbot:
         ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(sys.executable))))
     else:
         ROOT = os.path.dirname(os.path.abspath(__file__))
-    HISTORY_DIR = os.path.join(ROOT, 'history')
-    PROFILE_DIR = os.path.join(ROOT, 'profile')
-    PROFILE_TRASH_DIR = os.path.join(PROFILE_DIR, 'trash')
+    HISTORY_DIR = os.path.join(ROOT, 'history')  #存放编译阅读的md文件
+    PROFILE_DIR = os.path.join(ROOT, 'profile')  #存放会话配置文件
+    PROFILE_TRASH_DIR = os.path.join(PROFILE_DIR, 'trash') #删除的会话配置文件
     ENV_FILE = os.path.join(ROOT, '.env')
 
     def __init__(self) -> None:
@@ -29,14 +29,26 @@ class chatbot:
 
         self.init()
 
-    def init(self, profile=None):
+    def init(self):
         '''
-        profile: 从历史记录加载时所需，目前只加载 profile['messages']
+        初始化所有成员变量：初始化时戳、清空消息、清空Azure客户端和模型。
         '''
+        self._timestamp = '{}'.format(datetime.datetime.now()).replace('-', '_').replace(':', '_').replace(' ','_')
+        self._messages = []
+        self._history_handler = None
+        self._client = None
+        self._model = None
+
+    def setup_client(self, force):
+        '''
+        搭建Azure客户端，第一次向服务器发送请求前执行一次。
+        '''
+        if self._client is not None and not force:
+            return
+
         for env_var in ['API_KEY', 'ENDPOINT', 'OPENAI_GPT_DEPLOYMENT_NAME']:
             if os.getenv(env_var) is None:
                 raise Exception(f'{env_var} not found in {chatbot.ENV_FILE}')
-
 
         api_key = os.getenv("API_KEY")  # azure_server['key']
         api_version = "2024-05-01-preview"
@@ -46,34 +58,72 @@ class chatbot:
                         api_version=api_version,
                         azure_endpoint = azure_endpoint
                     )
-        self._messages = []
-        if profile is not None:
-            if 'messages' in profile: self._messages = profile['messages']
         self._model = os.getenv("OPENAI_GPT_DEPLOYMENT_NAME") # azure_server['gpt']
 
-        self._timestamp = '{}'.format(datetime.datetime.now()).replace('-', '_').replace(':', '_').replace(' ','_') if profile is None else profile['timestamp']
+    def id(self):
+        '''
+        时戳作为bot(对话)的id
+        '''
+        return self._timestamp #加载历史对话后可能改变
 
+    def summary(self, char_lmt=64):
+        '''
+        话题总结。
+        '''
+        summary = 'null'
+        if len(self._messages)>0:
+            summary = self._messages[0]['content'].strip()[:char_lmt]
+        return summary
+
+
+    def profile(self):
+        '''
+        当前对话属性。
+        '''
+        export = {
+            'messages' : self._messages,
+            'timestamp': self._timestamp,
+            'summary' : self.summary(),
+        }
+        return export
+
+    def messages(self):
+        '''
+        返回以展示为目的的message list
+        '''
+        return self._messages
+        
+    def load_profile_data(self, profile):
+        '''
+        加载历史对话属性。
+        '''
+        if 'messages' in profile: self._messages = profile['messages']
+        if 'timestamp' in profile: self._timestamp = profile['timestamp']
         self._history_handler = None
+
+    def save_profile_to_file(self):
+        if len(self._messages)==0: # null conversation, do not save
+            return
+
+        if not os.path.exists(chatbot.PROFILE_DIR):
+            os.mkdir(chatbot.PROFILE_DIR)
+        file_path = os.path.abspath(os.path.join(chatbot.PROFILE_DIR, f'chat_{self._timestamp}.json'))
+        with open(file_path, 'w+', encoding='utf-8') as f:
+            json.dump(self.profile(), f, indent=4)
 
     def make_history_handler(self):
         if not os.path.exists(chatbot.HISTORY_DIR):
             os.mkdir(chatbot.HISTORY_DIR)
 
-        self._current_history = os.path.abspath(os.path.join(chatbot.HISTORY_DIR, f'chat_{self._timestamp}.md'))
-        self._history_handler = open(self._current_history, 'a+', encoding='utf-8')
-
-    def save_profile(self):
-        if len(self._messages)==0: # null conversation, do not save
-            return
-        
-        if not os.path.exists(chatbot.PROFILE_DIR):
-            os.mkdir(chatbot.PROFILE_DIR)
-        current_profile = os.path.abspath(os.path.join(chatbot.PROFILE_DIR, f'chat_{self._timestamp}.json'))
-        with open(current_profile, 'w+', encoding='utf-8') as f:
-            json.dump(self.profile(), f, indent=4)
-
+        file_path = os.path.abspath(os.path.join(chatbot.HISTORY_DIR, f'chat_{self._timestamp}.md'))
+        self._history_handler = open(file_path, 'a+', encoding='utf-8')
 
     def generate_response(self, infer_size=5):
+        '''
+        return text:str
+        '''
+        self.setup_client(force=False)
+
         print('waiting openai...')
         completion = self._client.chat.completions.create(
             model=self._model, # model = "deployment_name"
@@ -96,6 +146,11 @@ class chatbot:
         return message
     
     def generate_event(self, infer_size=5):
+        '''
+        return Stream
+        '''
+        self.setup_client(force=False)
+
         response = self._client.chat.completions.create(
             model=self._model, # model = "deployment_name"
             messages = self._messages[-infer_size:],
@@ -111,11 +166,42 @@ class chatbot:
         
         return response
 
-    
+    def generate_stream_response(self, placeholder, infer_size=5):
+        '''
+        streamly write response to placeholder.
+
+        return text:str
+        '''
+        message = ''
+        response = self.generate_event(infer_size=infer_size) 
+        if response is None: #不支持事件
+            return self.generate_response(infer_size=infer_size)
+        collected_messages = []
+
+        for chunk in response:
+            if len(chunk.choices):
+                chunk_message = chunk.choices[0].delta.content
+                if chunk_message is not None:
+                    collected_messages.append(chunk_message)
+                    message = ''.join(collected_messages)
+                    placeholder.markdown(message)
+                else:
+                    break
+            time.sleep(0.03)
+
+        return message
+
+
     def dmy_response(self, blocking=0):
         time.sleep(blocking)
         message = "this is dmy resopnse of '''" + self._messages[-1]['content'] + "'''"
         return message
+
+    def on_history_user_input(self, text):
+        if self._history_handler is None:
+            self.make_history_handler()
+        self._history_handler.write(f'>###### User:\n\n{text}\n\n...... Waiting AI ......\n\n')
+        self._history_handler.flush()
 
     def on_user_input(self, text):
         self._messages.append(
@@ -125,10 +211,7 @@ class chatbot:
             }
         )
 
-        if self._history_handler is None:
-            self.make_history_handler()
-        self._history_handler.write(f'>###### User:\n\n{text}\n\n...... Waiting AI ......\n\n')
-        self._history_handler.flush()
+        self.on_history_user_input(text)
 
     def on_history_text(self, text):
         if self._history_handler is None:
@@ -151,44 +234,29 @@ class chatbot:
                 {
                     "role":"assistant"|"user",
                     "content": str,
-                    "assistant_type":None|str,
-                    "type":'text'|'image_file'|None,
+                    "content_type":'text'|'image_file'|None,
+                    "assistant_name":None|str,
                 }
         '''
         if isinstance(message, list):
             self._messages.extend(message)
             for m in message:
-                if m['type']=='image_file':
+                if m['content_type']=='image_file':
                     self.on_history_image(m["content"])
-                else:#if m['type']=='text':
+                elif m['content_type']=='text':
                     self.on_history_text(m["content"])
+                else:
+                    raise Exception(f'Not support content_type={m["content_type"]}')
         else:
             self._messages.append(
                 {
                     "role":"assistant",
                     "content":message,
-                    "assistant_type":None,
-                    "type":'text',
+                    "content_type":'text',
+                    "assistant_name":None,
                 }
             )
             self.on_history_text(message)
-
-    def messages(self):
-        return self._messages
-
-    def profile(self):
-        export = {
-            'messages' : self._messages,
-            'timestamp': self._timestamp,
-        }
-
-        summary = 'null'
-        if len(self._messages)>0:
-            summary = self._messages[0]['content'].strip()[:64]
-
-        export['summary'] = summary
-
-        return export
 
     @staticmethod
     def force_load_env():
@@ -228,6 +296,9 @@ class chatbot:
 
     @staticmethod
     def delete_profile(fname):
+        '''
+        从profile目录移到profile/trash目录
+        '''
         if not os.path.exists(fname):
             raise Exception(f'delete {fname}: file not exist')
 
@@ -235,7 +306,9 @@ class chatbot:
             if not os.path.exists(chatbot.PROFILE_TRASH_DIR):
                 os.mkdir(chatbot.PROFILE_TRASH_DIR)
 
-            file_name = os.path.basename(fname)
+            source_path, file_name = os.path.split(fname)
+            if os.path.abspath(source_path)!=os.path.abspath(chatbot.PROFILE_DIR):
+                raise Exception(f'{fname} not in profile folder.')
 
             # 构建目标文件的完整路径
             destination_path = os.path.join(chatbot.PROFILE_TRASH_DIR, file_name)
@@ -243,3 +316,4 @@ class chatbot:
         except Exception as e:
             print(f"Error moving file: {e}")
             raise e
+

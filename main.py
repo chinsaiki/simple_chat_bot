@@ -229,9 +229,9 @@ for message in st.session_state.chatbot.messages():
                     st.write('💬')
     else:
         response = message["content"]
-        data_type = message["type"]
-        assistant_type = '🤖' if 'assistant_type' in message and message['assistant_type'] is not None else None
-        with st.chat_message(message["role"], avatar=assistant_type):
+        data_type = message["content_type"]
+        assistant_name = '🤖' if 'assistant_name' in message and message['assistant_name'] is not None else None
+        with st.chat_message(message["role"], avatar=assistant_name):
             col1, col2 = st.columns([12,1])
             with col1:
                 if data_type=='image_file':
@@ -306,14 +306,14 @@ if not st.session_state.is_waiting:
 else:
     st.chat_input(disabled=True)
     infer_size = st.session_state.message_range
-    assistant_type = '🤖' if st.session_state.is_assistant and st.session_state.chatbot.assistant_ready() else None
-    with st.chat_message("assistant", avatar=assistant_type):
+    assistant_name = '🤖' if st.session_state.is_assistant and st.session_state.chatbot.assistant_ready() else None
+    with st.chat_message("assistant", avatar=assistant_name):
         with st.spinner("Thinking..."):
             for retry in range(3):
                 try:
                     if st.session_state.is_dmy:
                         message = st.session_state.chatbot.dmy_response(1)
-                    elif assistant_type is not None:
+                    elif assistant_name is not None:
                         message = st.session_state.chatbot.generate_response(infer_size=infer_size)
                     else:
                         response_placeholder = st.empty()
