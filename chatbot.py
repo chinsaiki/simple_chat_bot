@@ -92,6 +92,9 @@ class chatbot:
         返回以展示为目的的message list
         '''
         return self._messages
+
+    def delet_last_message(self, nb):
+        self._messages = self._messages[:-nb]
         
     def load_profile_data(self, profile):
         '''
@@ -195,6 +198,7 @@ class chatbot:
     def dmy_response(self, blocking=0):
         time.sleep(blocking)
         message = "this is dmy resopnse of '''" + self._messages[-1]['content'] + "'''"
+        raise Exception('test broken')
         return message
 
     def on_history_user_input(self, text):

@@ -23,12 +23,13 @@ class hisTab():
         if st.button(f'刷新历史对话'):
             self.list_profiles()
 
+        st.divider()
         index = 0
         for summary, profile in self._profiles.items():
             msg_nb = len(profile['data']["messages"])
 
             with st.container(border=False):
-                cols = st.columns([2,4,1,1,1])
+                cols = st.columns([2,4,1,1,1], vertical_alignment='bottom')
                 with cols[0]:
                     st.write(summary)
                 with cols[1]:

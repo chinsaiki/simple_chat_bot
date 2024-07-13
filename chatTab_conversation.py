@@ -54,6 +54,13 @@ class chatTab_conversation():
 
         NEED_RERUN = False
 
+        messages = bot.messages()
+        if len(messages)==0:
+            self._is_waiting = False
+        else:
+            last_request = messages[-1]
+            self._is_waiting = last_request['role']=='user'
+
         # User-provided prompt
         if not self._is_waiting:
             if prompt := st.chat_input(key=self.key('chat_input')):
@@ -68,21 +75,22 @@ class chatTab_conversation():
                         self._is_waiting = False
 
         else:
-            st.chat_input(key=self.key('chat_input'), disabled=True)
+            # st.chat_input(key=self.key('chat_input'), disabled=True)
 
             with st.chat_message("assistant", avatar=assistant_icon):
-                with st.spinner("Thinking..."):
+                with st.spinner(f"Thinking..."):
                     for retry in range(3):
                         try:
                             if is_dmy:
-                                message = bot.dmy_response(1)
+                                message = bot.dmy_response(5)
                             else:
                                 response_placeholder = st.empty()
                                 message = bot.generate_stream_response(response_placeholder, infer_size=infer_size)
                             break
                         except Exception as e:
-                            st.error(f'{e}'[:40])
-                            st.error(f'#{retry} fail! Retrying...')
+                            if retry==0:
+                                st.info('>' + last_request['content'])
+                            st.error(f'#{retry} 失败:{e}  准备重试...')
                             if retry==3-1: raise e
                             time.sleep(1)
 

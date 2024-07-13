@@ -1,6 +1,5 @@
 
 import streamlit as st
-import extra_streamlit_components as stx
 from hisTab import hisTab
 from chatTab import chatTab
 
@@ -60,25 +59,6 @@ for ct in st.session_state.chatTabs:
     with tabs[index]:
         NEED_RERUN |= ct.place(on_chat_close=on_chat_close)
     index += 1
-
-# stx_data = [stx.TabBarItemData(id="hisTab", title="对话列表", description="")]
-# for ct in st.session_state.chatTabs:
-#     stx_data.append(
-#         stx.TabBarItemData(id=ct.id(), title=ct.title(16), description='')
-#     )
-
-# now_id = stx.tab_bar(data=stx_data, default=None)
-
-# is_chat = False
-# for ct in st.session_state.chatTabs:
-#     if now_id==ct.id():
-#         NEED_RERUN |= ct.place(on_chat_close=on_chat_close)
-#         is_chat = True
-#         break
-# if not is_chat:
-#     print('place histab')
-#     st.session_state.hisTab.place(on_new_chat=on_new_chat, on_load=on_history_load, on_delete=on_history_delete)
-
 
 if NEED_RERUN:
     st.rerun()

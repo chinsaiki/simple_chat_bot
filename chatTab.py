@@ -35,7 +35,8 @@ class chatTab():
         tabs = st.tabs(['对话', '控制'])
 
         with tabs[1]:
-            NEED_RERUN |= self._prop.place(on_chat_close=on_chat_close)
+            on_delete_last_message = lambda nb: self._bot.delet_last_message(nb)
+            NEED_RERUN |= self._prop.place(on_chat_close=on_chat_close, on_delete_last_message=on_delete_last_message)
         with tabs[0]:
             NEED_RERUN |= self._conv.place(
                 bot=self._bot,
