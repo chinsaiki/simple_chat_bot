@@ -26,7 +26,6 @@ class chatbotAssist(chatbot):
         '''
         self._assistant = None
         self._thread = None
-        self._message_file = None
 
     def assistant_ready(self):
         return self._assistant is not None
