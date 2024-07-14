@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.config as stopt
 from chatbot import chatbot
-import pyperclip
 import time
 import os
 import signal
