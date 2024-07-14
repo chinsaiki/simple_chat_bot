@@ -198,7 +198,7 @@ class chatbot:
     def dmy_response(self, blocking=0):
         time.sleep(blocking)
         message = "this is dmy resopnse of '''" + self._messages[-1]['content'] + "'''"
-        raise Exception('test broken')
+        # raise Exception('test broken')
         return message
 
     def on_history_user_input(self, text):
@@ -257,10 +257,16 @@ class chatbot:
                     "role":"assistant",
                     "content":message,
                     "content_type":'text',
-                    "assistant_name":None,
                 }
             )
             self.on_history_text(message)
+
+
+    def assistant_ready(self):
+        return False
+
+    def assistant_prop(self):
+        return None
 
     @staticmethod
     def force_load_env():

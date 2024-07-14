@@ -10,6 +10,7 @@ class chatTab_conversation():
     def __init__(self, key='') -> None:
         self._key = key
         self._is_waiting = False
+        self._with_assist = False
 
     def key(self, info):
         return f'{self._key}_{info}'
@@ -63,16 +64,21 @@ class chatTab_conversation():
 
         # User-provided prompt
         if not self._is_waiting:
-            if prompt := st.chat_input(key=self.key('chat_input')):
-                self._is_waiting = True
-                with st.chat_message("user"):
-                    st.info(prompt)
-                    try:
-                        bot.on_user_input(prompt)
-                        bot.save_profile_to_file()
-                        NEED_RERUN = True
-                    except:
-                        self._is_waiting = False
+            cols = st.columns([11,1])
+            with cols[1]:
+                self._with_assist = st.checkbox('使用助手', value=False, disabled=not bot.assistant_ready())
+            with cols[0]:
+                if prompt := st.chat_input(key=self.key('chat_input')):
+                    self._is_waiting = True
+                    with st.chat_message("user"):
+                        st.info(prompt)
+                        try:
+                            bot.on_user_input(prompt)
+                            bot.save_profile_to_file()
+                            NEED_RERUN = True
+                        except Exception as e:
+                            self._is_waiting = False
+                            st.error(e)
 
         else:
             # st.chat_input(key=self.key('chat_input'), disabled=True)
