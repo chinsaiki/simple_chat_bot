@@ -69,7 +69,7 @@ class chatTab_properity():
 
     def place_delete_last_message(self, on_delete_last_message):
         NEED_RERUN = False
-        with st.form("upload-file", True):
+        with st.form(self.key('delete_last_msg'), True):
             cols = st.columns([2,1,4,2])
             with cols[1]:
                 st.text('最后')
@@ -87,11 +87,11 @@ class chatTab_properity():
 
     def place_assistant(self):
         with st.container(border=True):
-            select_assist = st.selectbox('选择助手', list(self._assistant_list.keys()), index=len(list(self._assistant_list.keys()))-1)
+            select_assist = st.selectbox('选择助手', list(self._assistant_list.keys()), index=len(list(self._assistant_list.keys()))-1, key=self.key('select_assist'))
             st.markdown(self._assistant_list[select_assist])
 
-            use_code = st.checkbox('代码解释器', value=False)
-            file_search = st.checkbox('附加文档', value=False)
+            use_code = st.checkbox('代码解释器', value=False, key=self.key('use_code'))
+            file_search = st.checkbox('附加文档', value=False, key=self.key('use_file_search'))
 
 
     def place_assistant_prop(self):
@@ -138,7 +138,7 @@ class chatTab_properity():
                 if st.button('重试', key=self.key('btn_retry')):
                     NEED_RERUN = True
 
-            self._bot_dmy_chat = st.checkbox('离线模式(测试用)', value=True, key=self.key('dmy_chat'))
+            self._bot_dmy_chat = st.checkbox('离线模式(测试用)', value=False, key=self.key('dmy_chat'))
 
             self.place_infer_size()
 

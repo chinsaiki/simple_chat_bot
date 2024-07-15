@@ -9,6 +9,27 @@ import sys
 from chat_message import chat_message
 import shutil
 
+
+def key_match(message_info_list, key_words):
+    if len(key_words)==0: return True
+    match = [0]*len(key_words)
+    for msg in message_info_list:
+        c = msg['content']
+        for i, k in enumerate(key_words):
+            if k in c: match[i] = 1
+        if sum(match)==len(key_words): return True
+    return False
+
+def key_match_in_single_msg(message_info_list, key_words):
+    if len(key_words)==0: return True
+    for msg in message_info_list:
+        c = msg['content']
+        match = [1 for x in key_words if x in c]
+        if sum(match)==len(key_words): return True
+    return False
+
+
+
 class chatbot:
     env_inited = False
     azure_server = {}
@@ -283,7 +304,9 @@ class chatbot:
             chatbot.azure_server = config[resource_name]
             
     @staticmethod
-    def list_profiles(key_size=32):
+    def list_profiles(key_size=32, key_words='', in_single_msg=False):
+        key_words = [x for x in key_words.split(' ') if len(x)>1]
+        
         profiles = OrderedDict()
         for fname in os.listdir(chatbot.PROFILE_DIR):
             fname = os.path.join(chatbot.PROFILE_DIR, fname)
@@ -292,12 +315,19 @@ class chatbot:
                 data = json.load(f)
                 key = data['summary'][:key_size]
                 if len(data['summary'])>len(key): key += '...'
+
                 if key!='null':
+                    if in_single_msg:
+                        if not key_match_in_single_msg(data["messages"], key_words): continue
+                    else:
+                        if not key_match(data["messages"], key_words): continue
+
                     in_key = key
                     r = 1
                     while in_key in profiles:
                         in_key = f'{key}[{r}]'
                         r += 1
+
                     profiles[in_key] = {
                         'data':data,
                         'fname': fname

@@ -1,5 +1,20 @@
-from streamlit.web import cli 
-#this uri depends based on version of your streamlit
-if __name__ == '__main__':
-    cli._main_run_clExplicit('main_tab.py', 'streamlit run')
-    #we will CREATE this function inside our streamlit framework
+import os
+import sys
+import streamlit.web.bootstrap
+
+# sys.path.append('./')
+
+if __name__ == "__main__":
+    # os.chdir(os.path.dirname(__file__))
+
+    flag_options = {
+    }
+
+    streamlit.web.bootstrap.load_config_options(flag_options=flag_options)
+    flag_options["_is_running_with_streamlit"] = True
+    streamlit.web.bootstrap.run(
+        "./main_tab.py",
+        False,
+        "streamlit run",
+        flag_options,
+    )

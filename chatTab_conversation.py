@@ -18,7 +18,7 @@ class chatTab_conversation():
 
     def place_messages(self, bot:chatbot, infer_size:int):
 
-        with st.container(height=550):
+        with st.container():
             # Display chat messages
             messages = bot.messages()
             n = len(messages)
@@ -48,10 +48,15 @@ class chatTab_conversation():
                             if inside_msg:
                                 st.write('💬')
                 n -= 1
+            if n==0 or message.role!='assistant':
+                return st.empty()
 
 
     def place(self, bot:chatbot, is_dmy:bool, infer_size:int, assistant_icon:str):
-        self.place_messages(bot=bot, infer_size=infer_size)
+
+        st.markdown(f"<a href='#linkto_btm_{self._key}'>跳到底部</a>", unsafe_allow_html=True)
+
+        response_placeholder = self.place_messages(bot=bot, infer_size=infer_size)
 
         NEED_RERUN = False
 
@@ -66,7 +71,8 @@ class chatTab_conversation():
         if not self._is_waiting:
             cols = st.columns([11,1])
             with cols[1]:
-                self._with_assist = st.checkbox('使用助手', value=False, disabled=not bot.assistant_ready())
+                self._with_assist = st.checkbox('使用助手', value=False, disabled=not bot.assistant_ready(), key=self.key('with_assist'))
+                st.markdown("<a href='#linkto_top'>回到顶部</a>", unsafe_allow_html=True)
             with cols[0]:
                 if prompt := st.chat_input(key=self.key('chat_input')):
                     self._is_waiting = True
@@ -90,7 +96,8 @@ class chatTab_conversation():
                             if is_dmy:
                                 message = bot.dmy_response(5)
                             else:
-                                response_placeholder = st.empty()
+                                if response_placeholder is None:
+                                    response_placeholder = st.empty()
                                 message = bot.generate_stream_response(response_placeholder, infer_size=infer_size)
                             break
                         except Exception as e:
@@ -105,6 +112,8 @@ class chatTab_conversation():
                     NEED_RERUN = True
 
                     self._is_waiting = False
+
+        st.markdown(f"<div id='linkto_btm_{self._key}'></div>", unsafe_allow_html=True)
 
         return NEED_RERUN
 
