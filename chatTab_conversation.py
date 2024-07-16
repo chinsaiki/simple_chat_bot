@@ -86,7 +86,9 @@ class chatTab_conversation():
                             self._is_waiting = False
                             st.error(e)
 
+            st.markdown(f"<div id='linkto_btm_{self._key}'></div>", unsafe_allow_html=True)
         else:
+            st.markdown(f"<div id='linkto_btm_{self._key}'></div>", unsafe_allow_html=True)
             # st.chat_input(key=self.key('chat_input'), disabled=True)
 
             with st.chat_message("assistant", avatar=assistant_icon):
@@ -113,7 +115,6 @@ class chatTab_conversation():
 
                     self._is_waiting = False
 
-        st.markdown(f"<div id='linkto_btm_{self._key}'></div>", unsafe_allow_html=True)
 
         return NEED_RERUN
 
