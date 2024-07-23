@@ -2,8 +2,6 @@ import os
 import json
 import datetime
 import time
-from weakref import ref
-from openai.pagination import SyncCursorPage
 from openai.types.beta import Thread
 from openai.types.beta.threads import Message
 from openai import AzureOpenAI

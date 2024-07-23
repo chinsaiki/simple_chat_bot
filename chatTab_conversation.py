@@ -51,6 +51,15 @@ class chatTab_conversation():
             if n==0 or message.role!='assistant':
                 return st.empty()
 
+    def on_prompt(self, bot, prompt):
+        self._is_waiting = True
+        try:
+            bot.on_user_input(prompt)
+            bot.save_profile_to_file()
+        except Exception as e:
+            self._is_waiting = False
+            st.error(e)
+
 
     def place(self, bot:chatbot, is_dmy:bool, infer_size:int, assistant_icon:str):
 
@@ -72,20 +81,15 @@ class chatTab_conversation():
             cols = st.columns([11,1])
             with cols[1]:
                 self._with_assist = st.checkbox('使用助手', value=False, disabled=not bot.assistant_ready(), key=self.key('with_assist'))
+                if st.button('complete', key=self.key('chatTab_continue')):
+                    self.on_prompt(bot, '继续并完成你的回答。')
                 st.markdown("<a href='#linkto_top'>回到顶部</a>", unsafe_allow_html=True)
             with cols[0]:
                 if prompt := st.chat_input(key=self.key('chat_input')):
-                    self._is_waiting = True
                     with st.chat_message("user"):
                         st.info(prompt)
-                        try:
-                            bot.on_user_input(prompt)
-                            bot.save_profile_to_file()
-                            NEED_RERUN = True
-                        except Exception as e:
-                            self._is_waiting = False
-                            st.error(e)
-
+                        self.on_prompt(bot, prompt)
+            NEED_RERUN = self._is_waiting
             st.markdown(f"<div id='linkto_btm_{self._key}'></div>", unsafe_allow_html=True)
         else:
             st.markdown(f"<div id='linkto_btm_{self._key}'></div>", unsafe_allow_html=True)
