@@ -82,7 +82,7 @@ class chatTab_conversation():
             with cols[1]:
                 self._with_assist = st.checkbox('使用助手', value=False, disabled=not bot.assistant_ready(), key=self.key('with_assist'))
                 if st.button('complete', key=self.key('chatTab_continue')):
-                    self.on_prompt(bot, '继续并完成你的回答。')
+                    self.on_prompt(bot, '继续，只要回答剩余的部分。')
                 st.markdown("<a href='#linkto_top'>回到顶部</a>", unsafe_allow_html=True)
             with cols[0]:
                 if prompt := st.chat_input(key=self.key('chat_input')):
