@@ -177,7 +177,6 @@ class chatbotAssist(chatbot):
         '''
         self.setup_client(force=False)
         TimeOut = 30
-        print(f'TimeOut={TimeOut}')
         self._assistant = self._client.beta.assistants.create(
                             name=name,
                             instructions=instruction,
@@ -242,7 +241,6 @@ class chatbotAssist(chatbot):
         #线程消息必须是bot消息的子集
         size_thread = len(self._thread_messages)
         size_msg = len(self._messages)
-        print(f'thread messages = {size_thread}')
 
         need_reinit = False
         sync_id = -(len(self._messages)+1)
@@ -426,4 +424,13 @@ class chatbotAssist(chatbot):
         return pretty(parse_thread_message_all(self._client, self._thread, '助手名称占位符'), lfchar='\n\n')
 
     def debug_info(self):
-        return self.get_thread_message_text(online=False) + "\n\n" + pretty(self._messages, lfchar='\n\n')
+        thread_msg = self.get_thread_message_text(online=False)
+        local_msg = pretty(self._messages, lfchar='\n\n')
+        assist_info = pretty(json.loads(self._assistant.model_dump_json(indent=2)), lfchar='\n\n') if self._assistant is not None else 'Assistant is None'
+        thread_info = pretty(json.loads(self._thread.model_dump_json(indent=2)), lfchar='\n\n') if self._thread is not None else 'Thread is None'
+        return  "\n\n".join([
+                            assist_info,
+                            thread_info,
+                            thread_msg,
+                            local_msg
+                        ])
