@@ -2,10 +2,13 @@
 import streamlit as st
 from collections import OrderedDict
 
+_NO_ASSIST_ = '不使用助手'
 
 def list_assistants():
     ass = OrderedDict()
-    ass['代码助手-数据可视化'] = f"You are a helpful AI assistant who makes interesting visualizations based on data.\n\n" \
+    ass['万能助手'] = ([], f'你是一个万能的AI智能助手，可以回答我的所有问题。')
+    ass['代码助手-数据可视化'] = ( [{"type": "code_interpreter"}],
+                        f"You are a helpful AI assistant who makes interesting visualizations based on data.\n\n" \
                         f"You have access to a sandboxed environment for writing and testing code.\n\n" \
                         f"When you are asked to create a visualization you should follow these steps:\n\n" \
                         f"1. Write the code.\n\n" \
@@ -13,17 +16,21 @@ def list_assistants():
                         f"3. Run the code to confirm that it runs.\n\n" \
                         f"4. If the code is successful display the visualization.\n\n" \
                         f"5. If the code is unsuccessful display the error message and try to revise the code and rerun going through the steps from above again."
+                        )
+    ass['文档助手'] = ( [{"type": "file_search"}],
+                    f"你是一个可靠的文档智能助理，可以阅读多个文档信息并作出整理、总结和推理。\n\n" \
+                    f"当我询问问题时，你按照以下步骤作出回应:\n\n" \
+                    f"1. 从文档中查找相关信息，列出至少3个最接近问题的段落位置和摘要。\n\n" \
+                    f"2. 总结相关信息并给出问题的答案。\n\n" \
+                    f"3. 从文档之外你所知数据中提供问题答案的相关参考信息。"
+                    )
 
-    ass['文档助手'] = f"你是一个可靠的文档智能助理，可以阅读多个文档信息并作出整理、总结和推理。\n\n" \
-                      f"当我询问问题时，你按照以下步骤作出回应:\n\n" \
-                      f"1. 从文档中查找相关信息，列出至少3个最接近问题的段落位置和摘要。\n\n" \
-                      f"2. 总结相关信息并给出问题的答案。\n\n" \
-                      f"3. 从文档之外你所知数据中提供问题答案的相关参考信息。"
-
-    ass["specific document Analyst Assistant"] = "You are a professional technical document analyst. Use your knowledge base to answer questions about specific document technologies."
+    ass["specific document Analyst Assistant"] = ( [{"type": "file_search"}],
+                        "You are a professional technical document analyst. Use your knowledge base to answer questions about specific document technologies."
+                    )
 
 
-    ass['不使用助手'] = None
+    ass[_NO_ASSIST_] = ([], None)
     return ass
 
 class chatTab_properity():
@@ -45,6 +52,12 @@ class chatTab_properity():
     def key(self, info):
         return f'{self._key}_{info}'
 
+    def infer_size(self):
+        if self._bot_infer_size>=chatTab_properity.MSG_RANGE_MAX:
+            return 100
+        return self._bot_infer_size
+
+
     def place_infer_size(self):
         with st.container(border=True):
             st.write("参考历史深度")
@@ -57,7 +70,7 @@ class chatTab_properity():
                     self.update_slider_state(-2)
             with cols[2]:
                 st.write("\n")
-                if st.button('➕', key=self.key('infer_size_inc')):
+                if st.button('➕', key=self.key('infer_size_inc'), help=f'{chatTab_properity.MSG_RANGE_MAX}:无限(实际约100)'):
                     self.update_slider_state(2)
             with cols[1]:
                 st.slider('chat range', min_value=chatTab_properity.MSG_RANGE_MIN, max_value=chatTab_properity.MSG_RANGE_MAX, 
@@ -85,18 +98,40 @@ class chatTab_properity():
                     NEED_RERUN = True
         return NEED_RERUN
 
-    def place_assistant(self):
-        with st.container(border=True):
-            select_assist = st.selectbox('选择助手', list(self._assistant_list.keys()), index=len(list(self._assistant_list.keys()))-1, key=self.key('select_assist'))
-            st.markdown(self._assistant_list[select_assist])
-
+    def place_assistant(self, on_use_assist, on_reset_assist, on_qurey_assist):
+        select_assist = st.selectbox('选择助手', list(self._assistant_list.keys()), index=len(list(self._assistant_list.keys()))-1, key=self.key('select_assist'))
+        st.markdown(self._assistant_list[select_assist][1])
+        with st.form(key=self.key('prop form'), border=False, clear_on_submit=False):
             use_code = st.checkbox('代码解释器', value=False, key=self.key('use_code'))
             file_search = st.checkbox('附加文档', value=False, key=self.key('use_file_search'))
 
+            cols = st.columns(2)
 
-    def place_assistant_prop(self):
-        pass
-
+            with cols[1]:
+                qurey = st.form_submit_button('查询当前助手状态')
+            with cols[0]:
+                apply = st.form_submit_button('应用')
+            if apply:
+                if select_assist==_NO_ASSIST_:
+                    on_reset_assist()
+                else:
+                    tools = self._assistant_list[select_assist][0]
+                    if use_code:
+                        already = False
+                        for t,v in tools.items():
+                            if t=='type' and v=='code_interpreter': already = True
+                        if not already:
+                            tools.append({"type": "code_interpreter"})
+                    if file_search:
+                        already = False
+                        for t,v in tools.items():
+                            if t=='type' and v=='file_search': already = True
+                        if not already:
+                            tools.append({"type": "file_search"})
+                    with st.spinner('初始化...'):
+                        on_use_assist(name=select_assist, instruction=self._assistant_list[select_assist][1], tools=tools)
+            if apply or qurey:
+                st.text(on_qurey_assist())    
 
     def place_assistant_files(self):
         pass
@@ -122,11 +157,17 @@ class chatTab_properity():
         #         # st.success(f'文件上传成功，保存到 {st.session_state[DAMP_AP_CONFIG_SOURCE]}')
         # st.session_state.with_file = st.checkbox('谈谈文件', value=False)
 
-    def place(self, on_chat_close, on_delete_last_message):
+    def place(self, on_chat_close, on_delete_last_message, on_use_assist, on_reset_assist, on_qurey_assist):
         NEED_RERUN = False
 
         col0, col1 = st.columns([4,4])
         with col0:
+
+            self._bot_dmy_chat = st.checkbox('离线模式(测试用)', value=False, key=self.key('dmy_chat'))
+
+            self.place_infer_size()
+
+            NEED_RERUN |= self.place_delete_last_message(on_delete_last_message)
 
             btn_cols = st.columns([1,1])
             with btn_cols[0]:
@@ -138,15 +179,8 @@ class chatTab_properity():
                 if st.button('重试', key=self.key('btn_retry')):
                     NEED_RERUN = True
 
-            self._bot_dmy_chat = st.checkbox('离线模式(测试用)', value=False, key=self.key('dmy_chat'))
-
-            self.place_infer_size()
-
-            NEED_RERUN |= self.place_delete_last_message(on_delete_last_message)
-
-
         with col1:
-            self.place_assistant()
+            self.place_assistant(on_use_assist, on_reset_assist, on_qurey_assist)
 
 
 

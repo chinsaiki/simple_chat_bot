@@ -6,6 +6,7 @@ from openai.types.beta import Thread
 from openai.types.beta.threads import Message
 from openai import AzureOpenAI
 from typing import List
+from collections import OrderedDict
 
 from chatbot import chatbot
 
@@ -13,17 +14,46 @@ ASSIST_NAME = 'assist_name'
 ASSIST_INST = 'assist_instruction'
 
 
-def parse_thread_messages(client:AzureOpenAI, thread:Thread, assistant_name:str):
+## 以缩进形式打印任意字典
+def pretty(value, htchar='\t', lfchar='\n', indent=0):
+    nlch = lfchar + htchar * (indent + 1)
+    if isinstance(value, (dict, OrderedDict)):
+        keys = list(value.keys())
+        if not isinstance(value, OrderedDict):
+            keys = sorted(keys)
+        items = [
+            nlch + repr(key) + ': ' + pretty(value[key], htchar, lfchar, indent + 1)
+            for key in keys
+        ]
+        return '{%s}' % (','.join(items) + lfchar + htchar * indent)
+    elif type(value) is list:
+        items = [
+            nlch + pretty(item, htchar, lfchar, indent + 1)
+            for item in value
+        ]
+        return '[%s]' % (','.join(items) + lfchar + htchar * indent)
+    elif type(value) is tuple:
+        items = [
+            nlch + pretty(item, htchar, lfchar, indent + 1)
+            for item in value
+        ]
+        return '(%s)' % (','.join(items) + lfchar + htchar * indent)
+    else:
+        return repr(value)
+
+def parse_thread_message_all(client:AzureOpenAI, thread:Thread, assistant_name:str):
+    if client is None or thread is None:
+        return {'ERROR': f'client={client}, thread={thread}'}
     thread_messages = client.beta.threads.messages.list(
                                                         thread_id =thread.id
                                                     )
     message_infos = []
     for message in thread_messages.data[::-1]: #data[0]是最新的消息
-        message_infos.extend(parse_thread_message(message, client, thread, assistant_name))
+        message_infos.extend(parse_thread_message_single(message, client, thread, assistant_name))
 
     return message_infos
 
-def parse_thread_message(thread_message:Message, client:AzureOpenAI, thread:Thread, assistant_name:str ):
+def parse_thread_message_single(thread_message:Message, client:AzureOpenAI, thread:Thread, assistant_name:str ):
     message_infos = []
     for content in thread_message.content:
         if content.type=='text':
@@ -39,7 +69,9 @@ def parse_thread_message(thread_message:Message, client:AzureOpenAI, thread:Thre
                     cited_file = client.files.retrieve(file_citation.file_id)
                     citations.append(f"[{index}] {cited_file.filename}")
 
-            text = message_content.value.strip() + "\n" + '\n'.join(citations)
+            text = message_content.value.strip()
+            if len(citations):
+                text += "\n" + '\n'.join(citations)
             message_info = {
                             "role": thread_message.role,
                             "content":text,
@@ -73,7 +105,7 @@ def search_thread_msg(messages, thread_messages):
     th_msg = thread_messages[-1]
     size = len(thread_messages)
     smax = len(messages)
-    # print(f'search_thread_msg {smax} vs. {size}')
+    # print(f'search_thread_msg size_msg={smax} size_thread={size}')
     for i, msg in enumerate(messages[::-1]):
         # print(f"  #-{i} {msg['content']}")
         if smax-i<size: #不足
@@ -119,15 +151,18 @@ class chatbotAssist(chatbot):
     def init(self):
         super(chatbotAssist, self).init()
         self.assist_init()
+        self.thread_init()
 
     def assist_init(self):
         '''
         初始化成员变量：助手、对话线程、对话数据库
         '''
         self._assistant = None
+        self._vector_stores = []
+
+    def thread_init(self):
         self._thread = None
         self._thread_messages = []
-        self._vector_stores = []
 
     def assistant_ready(self):
         return self._assistant is not None
@@ -136,43 +171,53 @@ class chatbotAssist(chatbot):
         if not self.assistant_ready(): return 'no assistant'
         return self._assistant.name
 
-    def init_assistant(self, name, instruction, tools):
+    def setup_assistant(self, name, instruction, tools):
         '''
         tools: [{"type": "code_interpreter"}, {"type": "file_search"}]
         '''
-        # self._assistant = self._client.beta.assistants.create(
-        #                     name=name,
-        #                     instructions=instruction,
-        #                     tools=tools,
-        #                     model=self._model, #目前由环境变量指定
-        #                     timeout=15,
-        #                 )
+        self.setup_client(force=False)
+        TimeOut = 30
+        print(f'TimeOut={TimeOut}')
+        self._assistant = self._client.beta.assistants.create(
+                            name=name,
+                            instructions=instruction,
+                            tools=tools,
+                            model=self._model, #目前由环境变量指定
+                            timeout=TimeOut,
+                        )
 
-        self._assistant = dmy_ass()
-        self._assistant.name = name
-        self._assistant.id = name
-        self._assistant.instruction = instruction
-        self._assistant.tools = tools
+        # self._assistant = dmy_ass()
+        # self._assistant.name = name
+        # self._assistant.id = name
+        # self._assistant.instruction = instruction
+        # self._assistant.tools = tools
 
 
     def assistant_prop(self):
         if self._client is None or self._assistant is None:
-            return None
+            cli_is_None = ' "client is None"' if self._client is None else ''
+            ass_is_None = ' "assistant is None"' if self._assistant is None else ''
+            return {'ERROR':f'No assistant for{cli_is_None}{ass_is_None}.'}
 
         # self._assistant = self._client.beta.assistants.retrieve(self._assistant.id)
 
         return json.loads(self._assistant.model_dump_json(indent=2))
 
-    def init_thread(self, infer_size=32):
+    def assistant_prop_text(self):
+        dic = self.assistant_prop()
+        return pretty(dic)
+
+    def setup_thread(self, infer_size=32):
         '''
         thread实质上是助手和用户之间对话会话的记录。
         '''
         self._thread = self._client.beta.threads.create(
-            messages=self._messages[-infer_size:]
+            messages=self.chat_messages[-infer_size:],
+            timeout=30
         )
-        self._thread_messages = parse_thread_messages(self._client, self._thread, self.assistant_name())
+        self._thread_messages = parse_thread_message_all(self._client, self._thread, self.assistant_name())
 
-        print(json.dumps(self._thread_messages, indent=4))
+        # print(json.dumps(self._thread_messages, indent=4))
 
     def with_file(self, vid_list):
         self._assistant = self._client.beta.assistants.update(
@@ -185,21 +230,38 @@ class chatbotAssist(chatbot):
                                                             tool_resources={"file_search": {"vector_store_ids": vid_list}},
                                                         )
 
+    def delet_last_message(self, nb):
+        super(chatbotAssist, self).delet_last_message(nb)
+        if nb>0:
+            self._thread_messages = [] #清空线程消息
+            print('thread messages cleared')
     def sync_user_msg(self, infer_size=5):
+        '''
+        用于保证最后 infer_size 是一致的
+        '''
         #线程消息必须是bot消息的子集
         size_thread = len(self._thread_messages)
         size_msg = len(self._messages)
+        print(f'thread messages = {size_thread}')
 
         need_reinit = False
         sync_id = -(len(self._messages)+1)
         if size_msg<size_thread:
             #已有消息被删除
             need_reinit = True
+            print('要求重建：已有消息被删除')
         elif size_thread==0:
-            #线程未初始化
+            #线程消息为空
             need_reinit = size_msg!=0
+            print('要求重建：线程消息为空')
         else:
             need_reinit, sync_id = search_thread_msg(self._messages, self._thread_messages)
+            if need_reinit:
+                print('要求重建：search_thread_msg')
+                with open('debug/thread_msg.json', 'w+') as f:
+                    json.dump(self._thread_messages, f)
+                with open('debug/msg.json', 'w+') as f:
+                    json.dump(self._messages, f)
 
         if not need_reinit:
             for msg in self._messages[len(self._messages)+1+sync_id:]:
@@ -208,25 +270,30 @@ class chatbotAssist(chatbot):
                                                                     role=msg["role"],
                                                                     content=msg["content"], # Replace this with your prompt
                                                                     )
-                responses = parse_thread_message(message, self._client, self._thread, self.assistant_name())
-                self._thread_messages.extend(responses)
-
-        if len(self._thread_messages)<infer_size and len(self._messages)>=infer_size:
-            need_reinit = True
+                responses = parse_thread_message_single(message, self._client, self._thread, self.assistant_name())
+                self._thread_messages.extend(responses) #至此两套messages应该等长
+        
+        if not need_reinit:
+            if len(self._thread_messages)<infer_size and len(self._messages)>len(self._thread_messages):
+                print('要求重建：补充到infer')
+                need_reinit = True
 
         if need_reinit:
-            self.init_thread(infer_size=infer_size)
+            print(f'重建 tread({infer_size})')
+            self.setup_thread(infer_size=infer_size)
+            print('done')
 
-    def generate_response(self, infer_size=5):
+    def assistant_response(self, infer_size=5):
         '''
         返回 消息列表或抛出异常
         '''
         if not self.assistant_ready():
-            raise Exception('助手未初始化，请【列出助手】-【选择助手】')
+            return '助手未初始化，请【跳到顶部】->【控制】->【选择助手及参数】->【应用】'
+        infer_size = max(infer_size, 1)
 
         self.sync_user_msg(infer_size=infer_size)
 
-        print('waiting openai...')
+        print('waiting openai... ')
         
         run = self._client.beta.threads.runs.create(
                                                     thread_id=self._thread.id,
@@ -251,7 +318,7 @@ class chatbotAssist(chatbot):
             if len(thread_messages.data)==0 or thread_messages.data[0].role!='assistant':
                 raise Exception(f'Not assistant message:\n{thread_messages.model_dump_json(indent=4)}')
 
-            responses = parse_thread_message(thread_messages.data[0], self._client, self._thread, self.assistant_name())
+            responses = parse_thread_message_single(thread_messages.data[0], self._client, self._thread, self.assistant_name())
 
             self._thread_messages.extend(responses)
 
@@ -264,7 +331,10 @@ class chatbotAssist(chatbot):
             print(run.status)
         
         return responses
-    
+
+    def generate_response(self, infer_size=5):
+        return self.assistant_response(infer_size)
+
     # def on_user_input(self, text):
     #     print(text)
     #     super(chatbotAssist, self).on_user_input(text)
@@ -348,3 +418,12 @@ class chatbotAssist(chatbot):
             self._vector_stores.append(self._client.beta.vector_stores.retrieve(vector_store_id = vid))
 
         raise Exception(f'upload {file_batch.status}')
+
+    def get_thread_message_text(self, online=False):
+        if not online:
+            return pretty(self._thread_messages, lfchar='\n\n')
+        
+        return pretty(parse_thread_message_all(self._client, self._thread, '助手名称占位符'), lfchar='\n\n')
+
+    def debug_info(self):
+        return self.get_thread_message_text(online=False) + "\n\n" + pretty(self._messages, lfchar='\n\n')

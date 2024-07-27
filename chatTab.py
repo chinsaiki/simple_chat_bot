@@ -36,13 +36,17 @@ class chatTab():
 
         with tabs[1]:
             on_delete_last_message = lambda nb: self._bot.delet_last_message(nb)
-            NEED_RERUN |= self._prop.place(on_chat_close=on_chat_close, on_delete_last_message=on_delete_last_message)
+            NEED_RERUN |= self._prop.place(on_chat_close=on_chat_close, 
+                                            on_delete_last_message=on_delete_last_message, 
+                                            on_use_assist=self._bot.setup_assistant, 
+                                            on_reset_assist=self._bot.assist_init, 
+                                            on_qurey_assist=self._bot.assistant_prop_text
+                                            )
         with tabs[0]:
             NEED_RERUN |= self._conv.place(
                 bot=self._bot,
                 is_dmy=self._prop._bot_dmy_chat,
-                infer_size=self._prop._bot_infer_size,
+                infer_size=self._prop.infer_size(),
                 assistant_icon=None,
             )
-
         return NEED_RERUN

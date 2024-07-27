@@ -45,5 +45,5 @@ class chat_message():
         if 'tools' in data: msg.tools = data['tools']
         if 'files' in data: msg.files = data['files']
         if msg.files is not None and msg.assistant_icon is not None:
-            msg.assistant_icon += '📖' #📑
+            msg.assistant_icon += '📑' #📖
         return msg

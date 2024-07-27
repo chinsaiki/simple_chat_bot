@@ -114,8 +114,16 @@ class chatbot:
         '''
         return self._messages
 
+    @property
+    def chat_messages(self):
+        '''
+        只包含role/content
+        '''
+        return [{'role':x['role'], 'content':x['content']} for x in self._messages]
+
     def delet_last_message(self, nb):
-        self._messages = self._messages[:-nb]
+        if nb>0:
+            self._messages = self._messages[:-nb]
         
     def load_profile_data(self, profile):
         '''
@@ -142,6 +150,9 @@ class chatbot:
         file_path = os.path.abspath(os.path.join(chatbot.HISTORY_DIR, f'chat_{self._timestamp}.md'))
         self._history_handler = open(file_path, 'a+', encoding='utf-8')
 
+    def assistant_response(self, infer_size=5):
+        return 'No assitant.'
+
     def generate_response(self, infer_size=5):
         '''
         return text:str
@@ -151,7 +162,7 @@ class chatbot:
         print('waiting openai...')
         completion = self._client.chat.completions.create(
             model=self._model, # model = "deployment_name"
-            messages = self._messages[-infer_size:],
+            messages = self.chat_messages[-infer_size:],
             temperature=0.7,
             max_tokens=800,
             top_p=0.95,
@@ -177,7 +188,7 @@ class chatbot:
 
         response = self._client.chat.completions.create(
             model=self._model, # model = "deployment_name"
-            messages = self._messages[-infer_size:],
+            messages = self.chat_messages[-infer_size:],
             temperature=0.7,
             max_tokens=800,
             top_p=0.95,
@@ -190,16 +201,20 @@ class chatbot:
         
         return response
 
-    def generate_stream_response(self, placeholder, infer_size=5):
+    def generate_stream_response(self, placeholder, assistant=False, infer_size=5):
         '''
         streamly write response to placeholder.
 
         return text:str
         '''
         message = ''
-        response = self.generate_event(infer_size=infer_size) 
-        if response is None: #不支持事件
-            return self.generate_response(infer_size=infer_size)
+        response = None
+        if assistant:
+            return self.assistant_response(infer_size=infer_size)
+        else:
+            response = self.generate_event(infer_size=infer_size) 
+            if response is None: #不支持事件
+                return self.generate_response(infer_size=infer_size)
         collected_messages = []
 
         for chunk in response:
@@ -238,17 +253,17 @@ class chatbot:
 
         self.on_history_user_input(text)
 
-    def on_history_text(self, text):
+    def on_history_text(self, assist_name, text):
         if self._history_handler is None:
             self.make_history_handler()
-        self._history_handler.write(f'>###### AI:\n\n{text}\n\n-----------------------------------------------------------\n\n')
+        self._history_handler.write(f'>###### AI[{assist_name}]:\n\n{text}\n\n-----------------------------------------------------------\n\n')
         self._history_handler.flush()
 
-    def on_history_image(self, file_path):
+    def on_history_image(self, assist_name, file_path):
         if self._history_handler is None:
             self.make_history_handler()
         if sys.platform == "win32": file_path = file_path.replace("\\", "/")
-        self._history_handler.write(f'>###### AI:\n\n![{file_path}]({file_path})\n\n-----------------------------------------------------------\n\n')
+        self._history_handler.write(f'>###### AI[{assist_name}]:\n\n![{file_path}]({file_path})\n\n-----------------------------------------------------------\n\n')
         self._history_handler.flush()
 
     def on_ai_response(self, message):
@@ -266,10 +281,13 @@ class chatbot:
         if isinstance(message, list):
             self._messages.extend(message)
             for m in message:
+                assistant_name = ''
+                if 'assistant_name' in m: assistant_name = m['assistant_name']
+
                 if m['content_type']=='image_file':
-                    self.on_history_image(m["content"])
+                    self.on_history_image(assistant_name, m["content"])
                 elif m['content_type']=='text':
-                    self.on_history_text(m["content"])
+                    self.on_history_text(assistant_name, m["content"])
                 else:
                     raise Exception(f'Not support content_type={m["content_type"]}')
         else:
@@ -280,7 +298,7 @@ class chatbot:
                     "content_type":'text',
                 }
             )
-            self.on_history_text(message)
+            self.on_history_text('', message)
 
 
     def assistant_ready(self):
@@ -288,6 +306,9 @@ class chatbot:
 
     def assistant_prop(self):
         return None
+
+    def debug_info(self):
+        return 'nothing'
 
     @staticmethod
     def force_load_env():
@@ -356,4 +377,5 @@ class chatbot:
         except Exception as e:
             print(f"Error moving file: {e}")
             raise e
+
 
