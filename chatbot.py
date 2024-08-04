@@ -150,10 +150,10 @@ class chatbot:
         file_path = os.path.abspath(os.path.join(chatbot.HISTORY_DIR, f'chat_{self._timestamp}.md'))
         self._history_handler = open(file_path, 'a+', encoding='utf-8')
 
-    def assistant_response(self, infer_size=5):
+    def assistant_response(self, infer_size=5, timeout=30):
         return 'No assitant.'
 
-    def generate_response(self, infer_size=5):
+    def generate_response(self, infer_size=5, timeout=30):
         '''
         return text:str
         '''
@@ -170,7 +170,7 @@ class chatbot:
             presence_penalty=0,
             stop=None,
             stream=False,
-            timeout=30
+            timeout=timeout
         )
         print('openai answered')
 
@@ -180,7 +180,7 @@ class chatbot:
         
         return message
     
-    def generate_event(self, infer_size=5):
+    def generate_event(self, infer_size=5, timeout=30):
         '''
         return Stream
         '''
@@ -196,12 +196,12 @@ class chatbot:
             presence_penalty=0,
             stop=None,
             stream=True,
-            timeout=30
+            timeout=timeout
         )
         
         return response
 
-    def generate_stream_response(self, placeholder, assistant=False, infer_size=5):
+    def generate_stream_response(self, placeholder, assistant=False, infer_size=5, timeout=30):
         '''
         streamly write response to placeholder.
 
@@ -210,11 +210,11 @@ class chatbot:
         message = ''
         response = None
         if assistant:
-            return self.assistant_response(infer_size=infer_size)
+            return self.assistant_response(infer_size=infer_size, timeout=timeout)
         else:
-            response = self.generate_event(infer_size=infer_size) 
+            response = self.generate_event(infer_size=infer_size, timeout=timeout) 
             if response is None: #不支持事件
-                return self.generate_response(infer_size=infer_size)
+                return self.generate_response(infer_size=infer_size, timeout=timeout)
         collected_messages = []
 
         for chunk in response:

@@ -234,7 +234,7 @@ class chatbotAssist(chatbot):
         if nb>0:
             self._thread_messages = [] #清空线程消息
             print('thread messages cleared')
-    def sync_user_msg(self, infer_size=5):
+    def sync_user_msg(self, infer_size=5, timeout=30):
         '''
         用于保证最后 infer_size 是一致的
         '''
@@ -256,17 +256,15 @@ class chatbotAssist(chatbot):
             need_reinit, sync_id = search_thread_msg(self._messages, self._thread_messages)
             if need_reinit:
                 print('要求重建：search_thread_msg')
-                with open('debug/thread_msg.json', 'w+') as f:
-                    json.dump(self._thread_messages, f)
-                with open('debug/msg.json', 'w+') as f:
-                    json.dump(self._messages, f)
 
         if not need_reinit:
             for msg in self._messages[len(self._messages)+1+sync_id:]:
+                print('creating thread msg... ')
                 message = self._client.beta.threads.messages.create(
                                                                     thread_id=self._thread.id,
                                                                     role=msg["role"],
                                                                     content=msg["content"], # Replace this with your prompt
+                                                                    timeout=timeout,
                                                                     )
                 responses = parse_thread_message_single(message, self._client, self._thread, self.assistant_name())
                 self._thread_messages.extend(responses) #至此两套messages应该等长
@@ -281,28 +279,31 @@ class chatbotAssist(chatbot):
             self.setup_thread(infer_size=infer_size)
             print('done')
 
-    def assistant_response(self, infer_size=5):
+    def assistant_response(self, infer_size=5, timeout=30):
         '''
         返回 消息列表或抛出异常
         '''
+        print(f'timeout={timeout}')
         if not self.assistant_ready():
             return '助手未初始化，请【跳到顶部】->【控制】->【选择助手及参数】->【应用】'
         infer_size = max(infer_size, 1)
 
-        self.sync_user_msg(infer_size=infer_size)
+        self.sync_user_msg(infer_size=infer_size, timeout=timeout)
 
         print('waiting openai... ')
         
         run = self._client.beta.threads.runs.create(
                                                     thread_id=self._thread.id,
-                                                    assistant_id=self._assistant.id
+                                                    assistant_id=self._assistant.id,
+                                                    timeout=timeout,
                                                     )
 
         while run.status in ['queued', 'in_progress', 'cancelling']:
             time.sleep(1)
             run = self._client.beta.threads.runs.retrieve(
                 thread_id=self._thread.id,
-                run_id=run.id
+                run_id=run.id,
+                timeout=timeout,
             )
 
         print(f'openai answered {run.status}')
@@ -310,7 +311,8 @@ class chatbotAssist(chatbot):
         responses = []
         if run.status == 'completed':
             thread_messages = self._client.beta.threads.messages.list(
-                                                                thread_id =self._thread.id
+                                                                thread_id =self._thread.id,
+                                                                timeout=timeout,
                                                             )
             
             if len(thread_messages.data)==0 or thread_messages.data[0].role!='assistant':

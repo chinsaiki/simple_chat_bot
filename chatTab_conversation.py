@@ -63,7 +63,7 @@ class chatTab_conversation():
     def on_with_assist(self):
         self._with_assist=st.session_state[self.key('with_assist')]
 
-    def place(self, bot:chatbot, is_dmy:bool, infer_size:int, assistant_icon:str):
+    def place(self, bot:chatbot, is_dmy:bool, infer_size:int, assistant_icon:str, timeout):
 
         st.markdown(f"<a href='#linkto_btm_{self._key}'>跳到底部</a>", unsafe_allow_html=True)
 
@@ -106,7 +106,7 @@ class chatTab_conversation():
                             else:
                                 if response_placeholder is None:
                                     response_placeholder = st.empty()
-                                message = bot.generate_stream_response(response_placeholder, assistant=self._with_assist, infer_size=infer_size)
+                                message = bot.generate_stream_response(response_placeholder, assistant=self._with_assist, infer_size=infer_size, timeout=timeout)
                             break
                         except Exception as e:
                             if retry==0:

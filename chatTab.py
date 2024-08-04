@@ -48,5 +48,6 @@ class chatTab():
                 is_dmy=self._prop._bot_dmy_chat,
                 infer_size=self._prop.infer_size(),
                 assistant_icon=None,
+                timeout=self._prop._timeout,
             )
         return NEED_RERUN

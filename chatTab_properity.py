@@ -7,6 +7,7 @@ _NO_ASSIST_ = '不使用助手'
 def list_assistants():
     ass = OrderedDict()
     ass['万能助手'] = ([], f'你是一个万能的AI智能助手，可以回答我的所有问题。')
+    ass['万能助手-dash应用'] = ([], f'你是一个对python中dash模块非常熟悉的的AI智能助手，可以为我解释关于dash框架的原理，并提供代码示例。')
     ass['代码助手-数据可视化'] = ( [{"type": "code_interpreter"}],
                         f"You are a helpful AI assistant who makes interesting visualizations based on data.\n\n" \
                         f"You have access to a sandboxed environment for writing and testing code.\n\n" \
@@ -17,6 +18,17 @@ def list_assistants():
                         f"4. If the code is successful display the visualization.\n\n" \
                         f"5. If the code is unsuccessful display the error message and try to revise the code and rerun going through the steps from above again."
                         )
+    ass['代码助手-dash应用'] = ( [{"type": "code_interpreter"}],
+                        f"You are a helpful AI assistant who makes interesting web app based on dash module of python.\n\n" \
+                        f"You have access to a sandboxed environment for writing and testing code.\n\n" \
+                        f"When you are asked to create a app you should follow these steps:\n\n" \
+                        f"1. Write the code.\n\n" \
+                        f"2. Anytime you write new code display web view of the code to show your work.\n\n" \
+                        f"3. Run the code to confirm that it runs.\n\n" \
+                        f"4. If the code is successful interact with all web call.\n\n" \
+                        f"5. If the code is unsuccessful display the error message and try to revise the code and rerun going through the steps from above again."
+                        )
+
     ass['文档助手'] = ( [{"type": "file_search"}],
                     f"你是一个可靠的文档智能助理，可以阅读多个文档信息并作出整理、总结和推理。\n\n" \
                     f"当我询问问题时，你按照以下步骤作出回应:\n\n" \
@@ -48,6 +60,8 @@ class chatTab_properity():
         self._bot_file_path = None
 
         self._assistant_list = list_assistants()
+
+        self._timeout = 30
 
     def key(self, info):
         return f'{self._key}_{info}'
@@ -157,6 +171,11 @@ class chatTab_properity():
         #         # st.success(f'文件上传成功，保存到 {st.session_state[DAMP_AP_CONFIG_SOURCE]}')
         # st.session_state.with_file = st.checkbox('谈谈文件', value=False)
 
+    def place_time_out(self):
+        def on_change():
+             self._timeout = st.session_state[self.key('timeout')]
+        st.number_input(label='timeout', value=30, min_value=1, max_value=3600, step=1, key=self.key('timeout'), on_change=on_change)
+
     def place(self, on_chat_close, on_delete_last_message, on_use_assist, on_reset_assist, on_qurey_assist):
         NEED_RERUN = False
 
@@ -166,6 +185,8 @@ class chatTab_properity():
             self._bot_dmy_chat = st.checkbox('离线模式(测试用)', value=False, key=self.key('dmy_chat'))
 
             self.place_infer_size()
+
+            self.place_time_out()
 
             NEED_RERUN |= self.place_delete_last_message(on_delete_last_message)
 
